@@ -1,2 +1,3 @@
 # Release build artifact (uploaded as a GitHub Release asset)
 ytdl.user.js
+node_modules/

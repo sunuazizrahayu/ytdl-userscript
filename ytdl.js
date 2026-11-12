@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YTDL
 // @namespace    ytdl-userscript
-// @version      1.0.1
+// @version      1.0.2
 // @description  Download any YouTube video in any available format.
 // @author       sunuazizrahayu
 // @license      MIT
@@ -28,7 +28,7 @@
    * CONFIGURATION
    * ============================================================ */
   const DEBUG = false;
-  const VERSION = '1.0.1';
+  const VERSION = '1.0.2';
 
   const log = (...a) => DEBUG && console.log('[YT-DL]', ...a);
   console.info(`[YT-DL] v${VERSION} active on`, location.href);
@@ -429,9 +429,19 @@
     return mergePlayerResponses(responses);
   }
 
+  // True when a raw player format belongs to the same audio track as `want`.
+  // Videos have no audioTrack id, so they match everything.
+  function sameAudioTrack(raw, want) {
+    if (!want || !want.audioTrackId) return true;
+    const at = raw.audioTrack || {};
+    return (at.id || '') === want.audioTrackId
+      && (at.isAutoDubbed === true) === Boolean(want.autoDubbed);
+  }
+
   // Fetch a fresh URL for a specific itag (used when the server rejects with 403).
-  // Try every client; avoid returning the exact same URL.
-  async function refreshUrlFor(itag, avoid) {
+  // Audio must keep the same track id, otherwise a refresh could silently
+  // switch the original audio to the auto-dubbed track.
+  async function refreshUrlFor(itag, avoid, want) {
     const vid = currentVideoId();
     if (!vid) return null;
     let fallback = null;
@@ -442,7 +452,7 @@
         ...(data.streamingData.formats || []),
         ...(data.streamingData.adaptiveFormats || []),
       ];
-      const found = all.find((x) => Number(x.itag) === Number(itag) && x.url);
+      const found = all.find((x) => Number(x.itag) === Number(itag) && x.url && sameAudioTrack(x, want));
       if (!found) continue;
       if (!fallback) fallback = found.url;
       if (found.url !== avoid) return found.url;
@@ -471,6 +481,18 @@
     if (c.includes('opus')) return 'Opus';
     if (c.includes('ec-3')) return 'EAC3';
     return c ? c.split('.')[0].toUpperCase() : '—';
+  }
+
+  // The media URL carries the exact byte length it will serve (`clen`).
+  // Metadata from different API clients can differ by a few bytes, so the
+  // URL value wins; otherwise a request can run past the real end (HTTP 416).
+  function clenOfUrl(url) {
+    try {
+      const value = Number(new URL(url, location.href).searchParams.get('clen'));
+      return Number.isFinite(value) && value > 0 ? value : 0;
+    } catch (err) {
+      return 0;
+    }
   }
 
   function normalizeFormat(raw, kind) {
@@ -503,7 +525,7 @@
       width: Number(raw.width) || 0,
       fps: Number(raw.fps) || 0,
       bitrate: Number(raw.bitrate || raw.averageBitrate) || 0,
-      size: Number(raw.contentLength) || 0,
+      size: clenOfUrl(url) || Number(raw.contentLength) || 0,
       audioQuality: raw.audioQuality || '',
       // Audio track metadata: YouTube can send several tracks with the
       // same itag (original + automatic dubbing). We keep it so we can pick
@@ -679,7 +701,7 @@
     return Boolean(err && (err.name === 'AbortError' || err.code === 20));
   }
 
-  async function fetchStream(url, total, onProgress, signal, mime, refresh) {
+  async function fetchStream(url, declaredTotal, onProgress, signal, mime, refresh) {
     const parts = [];
     let received = 0;
     let currentUrl = url;
@@ -689,8 +711,21 @@
     let totalNet = 0; // total network glitches for this download
     let empties = 0; // consecutive empty responses
     let restarts = 0; // server ignored Range (200) repeatedly
+    let overruns = 0; // HTTP 416 responses (offset past the real end)
+    let total = Number(declaredTotal) || 0;
     let mode = total > 0 ? 'chunk' : 'whole';
-    const totalKnown = total > 0;
+    let totalKnown = total > 0;
+
+    // The URL knows the exact served length. Keep `total` in sync with it,
+    // including after a refresh, so Range requests never pass the real end.
+    const syncTotal = (nextUrl) => {
+      const exact = clenOfUrl(nextUrl);
+      if (exact && exact !== total) {
+        total = exact;
+        totalKnown = true;
+      }
+    };
+    syncTotal(currentUrl);
 
     const freshUrl = async (current) => {
       if (typeof refresh !== 'function') return null;
@@ -703,6 +738,10 @@
     };
 
     while (true) {
+      // Everything already received: finish instead of asking for an empty
+      // or invalid range (which servers answer with HTTP 416).
+      if (totalKnown && received >= total) break;
+
       const end = totalKnown
         ? Math.min(received + (mode === 'whole' ? total : CHUNK_SIZE), total) - 1
         : null;
@@ -724,8 +763,26 @@
         await sleep(Math.min(2500, 400 * netFails));
         if (netFails >= 2) {
           const fresh = await freshUrl(currentUrl);
-          if (fresh) currentUrl = fresh;
+          if (fresh) {
+            currentUrl = fresh;
+            syncTotal(currentUrl);
+          }
         }
+        continue;
+      }
+
+      // The server says the offset is past the real end. Use the URL's exact
+      // length; if we already have all bytes, the download is complete.
+      if (res.status === 416) {
+        overruns += 1;
+        syncTotal(currentUrl);
+        if (totalKnown && received >= total) break;
+        if (overruns > 3) throw await httpError(res);
+        const fresh = await freshUrl(currentUrl);
+        if (!fresh) throw await httpError(res);
+        currentUrl = fresh;
+        syncTotal(currentUrl);
+        if (totalKnown && received >= total) break;
         continue;
       }
 
@@ -740,6 +797,7 @@
         const fresh = await freshUrl(currentUrl);
         if (!fresh) throw await httpError(res);
         currentUrl = fresh;
+        syncTotal(currentUrl);
 
         // Stay on 4 MB chunks. A URL that rejects resuming from the middle
         // is tried once with a single full remaining range; if that is also
@@ -799,7 +857,10 @@
         if (netFails > 10 || totalNet > 20) throw err;
         await sleep(Math.min(2500, 400 * netFails));
         const fresh = await freshUrl(currentUrl);
-        if (fresh) currentUrl = fresh;
+        if (fresh) {
+          currentUrl = fresh;
+          syncTotal(currentUrl);
+        }
         continue;
       }
 
@@ -818,6 +879,7 @@
         const fresh = await freshUrl(currentUrl);
         if (!fresh) break;
         currentUrl = fresh;
+        syncTotal(currentUrl);
         continue;
       }
 
@@ -832,7 +894,10 @@
         continue;
       }
       const fresh = await freshUrl(currentUrl);
-      if (fresh) currentUrl = fresh;
+      if (fresh) {
+        currentUrl = fresh;
+        syncTotal(currentUrl);
+      }
     }
 
     if (totalKnown && received < total) {
@@ -1208,15 +1273,18 @@
     };
 
     // Fallback URLs: the player capture first, then a fresh URL from the API.
-    const makeRefresher = (itag, initialUrl) => {
+    // Captured URLs are keyed by itag only, so they are skipped for audio
+    // tracks that need a specific language/dubbing identity.
+    const makeRefresher = (itag, initialUrl, want) => {
       let usedCaptured = false;
+      const canUseCaptured = !want || !want.audioTrackId;
       return async (current) => {
         const cap = captured.get(itag);
-        if (!usedCaptured && cap && cap !== initialUrl && cap !== current) {
+        if (canUseCaptured && !usedCaptured && cap && cap !== initialUrl && cap !== current) {
           usedCaptured = true;
           return cap;
         }
-        return await refreshUrlFor(itag, current);
+        return await refreshUrlFor(itag, current, want);
       };
     };
 
@@ -1265,7 +1333,7 @@
           },
           ctrl.signal,
           audio.mime || 'audio/mp4',
-          makeRefresher(f.audioItag, audio.url),
+          makeRefresher(f.audioItag, audio.url, audio),
         );
 
         setProgress(95, 'Merging video + audio…');
@@ -1299,7 +1367,7 @@
         },
         ctrl.signal,
         f.mime,
-        makeRefresher(f.itag, f.url),
+        makeRefresher(f.itag, f.url, f),
       );
 
       setProgress(100, `Saving ${formatBytes(blob.size)}…`);
