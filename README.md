@@ -30,6 +30,24 @@ A Tampermonkey userscript that adds a format picker above the YouTube player. Pi
 - A Chromium-based browser or Firefox with Tampermonkey.
 - Network access to `cdn.jsdelivr.net` — the script loads `mp4box@0.5.2` via `@require` to build the merged MP4.
 
+## Updates
+
+The script header points `@updateURL` and `@downloadURL` at the raw file on `main`:
+
+```text
+https://raw.githubusercontent.com/sunuazizrahayu/ytdl-userscript/main/ytdl.js
+```
+
+Tampermonkey checks for updates automatically (daily by default) and installs a new version when `@version` is higher than the installed one. To force a check: Tampermonkey dashboard → **Installed userscripts** → **YTDL** → **Check for updates**.
+
+Release flow:
+
+1. Bump `@version` and `const VERSION` in `ytdl.js` — both must match.
+2. Commit and push to `main`.
+3. Users receive the update on their next check (or immediately via the manual check above).
+
+Because the file is named `ytdl.js`, opening it directly in a browser does not trigger a one-click install. The updater still works through the metadata URLs above; first-time installation stays a copy-paste step (see [Installation](#installation)).
+
 ## Usage
 
 1. Open any YouTube watch page.

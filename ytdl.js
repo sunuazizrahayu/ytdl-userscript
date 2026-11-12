@@ -1,10 +1,14 @@
 // ==UserScript==
 // @name         YTDL
 // @namespace    ytdl-userscript
-// @version      0.0.0
+// @version      1.0.0
 // @description  Download any YouTube video in any available format.
 // @author       sunuazizrahayu
 // @license      MIT
+// @homepageURL  https://github.com/sunuazizrahayu/ytdl-userscript
+// @supportURL   https://github.com/sunuazizrahayu/ytdl-userscript/issues
+// @updateURL    https://raw.githubusercontent.com/sunuazizrahayu/ytdl-userscript/main/ytdl.js
+// @downloadURL  https://raw.githubusercontent.com/sunuazizrahayu/ytdl-userscript/main/ytdl.js
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
 // @icon         https://www.youtube.com/favicon.ico
