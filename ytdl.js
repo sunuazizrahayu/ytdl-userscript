@@ -1195,11 +1195,12 @@
     if (f.kind === 'audio') {
       quality = `${f.bitrate ? Math.round(f.bitrate / 1000) : 'audio'}kbps`;
     } else {
-      // Merged files: resolution + fps + codec (only when it matters for
-      // playback, e.g. AV1). No "(video+audio)" label in the filename.
+      // Merged files: resolution + fps + codec. No "(video+audio)" label
+      // in the filename.
       const res = f.height ? `${f.height}p` : (f.qualityLabel || '').replace(/\s+/g, '');
       const fps = f.fps ? `${Math.round(f.fps)}fps` : '';
-      const codec = f.merged && codecOf(f) === 'AV1' ? 'AV1' : '';
+      const codecName = f.merged ? codecOf(f) : '';
+      const codec = codecName && codecName !== '—' ? codecName : '';
       quality = [res, fps, codec].filter(Boolean).join(' ');
     }
     const ext = f.merged ? 'mp4' : containerOf(f).toLowerCase();
