@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YTDL
 // @namespace    ytdl-userscript
-// @version      1.0.0
+// @version      1.0.1
 // @description  Download any YouTube video in any available format.
 // @author       sunuazizrahayu
 // @license      MIT
@@ -28,7 +28,7 @@
    * CONFIGURATION
    * ============================================================ */
   const DEBUG = false;
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
 
   const log = (...a) => DEBUG && console.log('[YT-DL]', ...a);
   console.info(`[YT-DL] v${VERSION} active on`, location.href);
