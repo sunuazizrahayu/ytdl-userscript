@@ -7,8 +7,8 @@
 // @license      MIT
 // @homepageURL  https://github.com/sunuazizrahayu/ytdl-userscript
 // @supportURL   https://github.com/sunuazizrahayu/ytdl-userscript/issues
-// @updateURL    https://raw.githubusercontent.com/sunuazizrahayu/ytdl-userscript/main/ytdl.js
-// @downloadURL  https://raw.githubusercontent.com/sunuazizrahayu/ytdl-userscript/main/ytdl.js
+// @updateURL    https://github.com/sunuazizrahayu/ytdl-userscript/releases/latest/download/ytdl.user.js
+// @downloadURL  https://github.com/sunuazizrahayu/ytdl-userscript/releases/latest/download/ytdl.user.js
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
 // @icon         https://www.youtube.com/favicon.ico
