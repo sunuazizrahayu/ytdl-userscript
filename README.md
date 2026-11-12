@@ -66,7 +66,7 @@ If the format list is empty or some rows have no URL, let the video play for a f
 
 The script is a single file: [`ytdl.js`](./ytdl.js).
 
-- Version is defined in two places: `@version` in the metadata block and `const VERSION`.
+- The source keeps a placeholder version (`0.0.0`). The release workflow injects the version from the tag into both `@version` and `const VERSION` before building `ytdl.user.js` (`v1.2.3` → `1.2.3`). Tag `vX.Y.Z` to publish.
 - Diagnostics are available in the console via `window.__ytdl` (`version`, `state`, `captured`, `itags`).
 - Set `const DEBUG = true` for verbose logging.
 - Syntax check: `node --check ytdl.js`.

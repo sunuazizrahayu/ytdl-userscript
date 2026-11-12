@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YTDL
 // @namespace    ytdl-userscript
-// @version      1.0.2
+// @version      0.0.0
 // @description  Download any YouTube video in any available format.
 // @author       sunuazizrahayu
 // @license      MIT
@@ -28,7 +28,9 @@
    * CONFIGURATION
    * ============================================================ */
   const DEBUG = false;
-  const VERSION = '1.0.2';
+  // Placeholder. The release workflow overwrites this (and @version) with
+  // the git tag without its "v" prefix, e.g. v1.0.2 -> 1.0.2.
+  const VERSION = '0.0.0';
 
   const log = (...a) => DEBUG && console.log('[YT-DL]', ...a);
   console.info(`[YT-DL] v${VERSION} active on`, location.href);

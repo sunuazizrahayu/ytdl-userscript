@@ -20,35 +20,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate tag and version
+      - name: Build release asset
         run: |
           set -euo pipefail
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){1,3}$'; then
+            echo "::error::Tag $GITHUB_REF_NAME is not a valid version (expected vX.Y.Z)."
+            exit 1
+          fi
+
           node --check ytdl.js
 
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          META_VERSION=$(awk '/^\/\/ @version/ { print $3; exit }' ytdl.js | tr -d '[:space:]')
-          CODE_VERSION=$(sed -n "s/^  const VERSION = '\([^']*\)';/\1/p" ytdl.js | head -n1 | tr -d '[:space:]')
+          # Inject the version from the tag into both places that carry it.
+          sed -i -E "s|^// @version .*|// @version      ${VERSION}|" ytdl.js
+          sed -i -E "s|^  const VERSION = '[^']*';|  const VERSION = '${VERSION}';|" ytdl.js
 
-          if [ -z "$META_VERSION" ] || [ -z "$CODE_VERSION" ]; then
-            echo "::error::Could not read @version or const VERSION from ytdl.js"
-            exit 1
-          fi
+          grep -q "^// @version      ${VERSION}$" ytdl.js
+          grep -q "^  const VERSION = '${VERSION}';$" ytdl.js
 
-          if [ "$META_VERSION" != "$CODE_VERSION" ]; then
-            echo "::error::Version mismatch: @version is $META_VERSION but const VERSION is $CODE_VERSION"
-            exit 1
-          fi
+          node --check ytdl.js
+          cp ytdl.js ytdl.user.js
 
-          if [ "$TAG_VERSION" != "$META_VERSION" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match @version $META_VERSION. Bump the version before tagging."
-            exit 1
-          fi
-
-          echo "VERSION=$META_VERSION" >> "$GITHUB_ENV"
-          echo "Tag $GITHUB_REF_NAME matches version $META_VERSION"
-
-      - name: Build release asset
-        run: cp ytdl.js ytdl.user.js
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Injected version $VERSION into ytdl.user.js" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish release
         env:
@@ -60,7 +55,7 @@ jobs:
             echo "Updated asset on existing release $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"
           else
             gh release create "$GITHUB_REF_NAME" ytdl.user.js \
-              --title "YTDL $VERSION" \
+              --title "$GITHUB_REF_NAME" \
               --verify-tag \
               --generate-notes
             echo "Published $GITHUB_REF_NAME with asset ytdl.user.js." >> "$GITHUB_STEP_SUMMARY"
