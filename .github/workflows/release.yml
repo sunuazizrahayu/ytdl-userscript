@@ -2,16 +2,14 @@ name: Release
 
 on:
   push:
-    branches: [main]
-    paths:
-      - ytdl.js
-  workflow_dispatch:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 concurrency:
-  group: release
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -21,14 +19,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Validate version
+      - name: Validate tag and version
         run: |
           set -euo pipefail
           node --check ytdl.js
 
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
           META_VERSION=$(awk '/^\/\/ @version/ { print $3; exit }' ytdl.js | tr -d '[:space:]')
           CODE_VERSION=$(sed -n "s/^  const VERSION = '\([^']*\)';/\1/p" ytdl.js | head -n1 | tr -d '[:space:]')
 
@@ -42,36 +39,29 @@ jobs:
             exit 1
           fi
 
-          echo "VERSION=$META_VERSION" >> "$GITHUB_ENV"
-          echo "Releasing version $META_VERSION"
-
-      - name: Check for existing release
-        id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+          if [ "$TAG_VERSION" != "$META_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match @version $META_VERSION. Bump the version before tagging."
+            exit 1
           fi
 
-      - name: Create release
-        if: steps.check.outputs.exists == 'false'
+          echo "VERSION=$META_VERSION" >> "$GITHUB_ENV"
+          echo "Tag $GITHUB_REF_NAME matches version $META_VERSION"
+
+      - name: Build release asset
+        run: cp ytdl.js ytdl.user.js
+
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cp ytdl.js ytdl.user.js
-          gh release create "v$VERSION" ytdl.user.js \
-            --title "YTDL $VERSION" \
-            --target "$GITHUB_SHA" \
-            --generate-notes
-
-      - name: Summary
-        run: |
-          if [ "${{ steps.check.outputs.exists }}" = "true" ]; then
-            echo "v$VERSION already exists — nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" ytdl.user.js --clobber
+            echo "Updated asset on existing release $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Published v$VERSION with asset ytdl.user.js." >> "$GITHUB_STEP_SUMMARY"
+            gh release create "$GITHUB_REF_NAME" ytdl.user.js \
+              --title "YTDL $VERSION" \
+              --verify-tag \
+              --generate-notes
+            echo "Published $GITHUB_REF_NAME with asset ytdl.user.js." >> "$GITHUB_STEP_SUMMARY"
           fi

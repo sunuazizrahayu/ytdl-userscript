@@ -21,9 +21,9 @@ A Tampermonkey userscript that adds a format picker above the YouTube player. Pi
 2. Add the script — either:
    - copy the contents of [`ytdl.js`](./ytdl.js) and paste them into a new Tampermonkey script, or
    - open the [latest release](https://github.com/sunuazizrahayu/ytdl-userscript/releases/latest/download/ytdl.user.js) and confirm the installation.
-3. Open YouTube. The console should show `[YT-DL] v1.0.0 active on …`.
+3. Open YouTube. The console should show a `[YT-DL] v… active on …` banner.
 
-> Tampermonkey only auto-prompts for URLs ending in `.user.js`. This repo keeps the file as `ytdl.js`, so manual copy-paste is the reliable install path. If you prefer one-click installs in your fork, rename the file to `ytdl.user.js` (and update `@updateURL` / `@downloadURL`).
+> The repository file stays `ytdl.js` for source browsing. One-click install and updates use the `ytdl.user.js` asset attached to each release.
 
 ### Requirements
 
@@ -32,40 +32,7 @@ A Tampermonkey userscript that adds a format picker above the YouTube player. Pi
 
 ## Updates
 
-Updates are served from GitHub Releases. The script header points `@updateURL` and `@downloadURL` at the latest release asset:
-
-```text
-https://github.com/sunuazizrahayu/ytdl-userscript/releases/latest/download/ytdl.user.js
-```
-
-Tampermonkey checks for updates automatically (daily by default) and installs a new version when `@version` is higher than the installed one. To force a check: Tampermonkey dashboard → **Installed userscripts** → **YTDL** → **Check for updates**.
-
-### Release flow
-
-Releases are automated by [`.github/workflows/release.yml`](./.github/workflows/release.yml):
-
-1. Bump `@version` and `const VERSION` in `ytdl.js` — both must match.
-2. Commit and push to `main`.
-3. The workflow validates the script, creates tag `v<version>`, and publishes a GitHub Release with `ytdl.user.js` as the asset.
-
-Nothing is published when the tag already exists, so re-running the workflow is safe. You can also start it manually from **Actions → Release → Run workflow**.
-
-Manual fallback:
-
-```bash
-cp ytdl.js ytdl.user.js
-git tag -a v1.0.1 -m "YTDL 1.0.1"
-git push origin main v1.0.1
-gh release create v1.0.1 ytdl.user.js \
-  --title "YTDL 1.0.1" \
-  --notes "Describe changes here."
-```
-
-The `ytdl.user.js` build artifact is git-ignored; it only exists as a release asset. Users receive the update on their next check, or immediately via the manual check above.
-
-### First install
-
-Opening the release asset URL triggers Tampermonkey's install prompt because the asset ends in `.user.js`. The repository file stays `ytdl.js` for source browsing and manual copy-paste.
+The script header points `@updateURL` and `@downloadURL` at the latest release asset, so Tampermonkey keeps the script up to date automatically (daily by default). To force a check: Tampermonkey dashboard → **Installed userscripts** → **YTDL** → **Check for updates**.
 
 ## Usage
 
