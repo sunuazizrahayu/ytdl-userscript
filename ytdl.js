@@ -1204,7 +1204,7 @@
       quality = [res, fps, codec].filter(Boolean).join(' ');
     }
     const ext = f.merged ? 'mp4' : containerOf(f).toLowerCase();
-    return `${title} [${quality}][${f.itag}].${ext}`;
+    return `${title} [${quality}].${ext}`;
   }
 
   async function startDownload(f, row) {
