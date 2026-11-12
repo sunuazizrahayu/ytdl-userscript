@@ -42,9 +42,15 @@ Tampermonkey checks for updates automatically (daily by default) and installs a 
 
 ### Release flow
 
+Releases are automated by [`.github/workflows/release.yml`](./.github/workflows/release.yml):
+
 1. Bump `@version` and `const VERSION` in `ytdl.js` — both must match.
 2. Commit and push to `main`.
-3. Create a tag and a GitHub Release whose asset is named exactly `ytdl.user.js`:
+3. The workflow validates the script, creates tag `v<version>`, and publishes a GitHub Release with `ytdl.user.js` as the asset.
+
+Nothing is published when the tag already exists, so re-running the workflow is safe. You can also start it manually from **Actions → Release → Run workflow**.
+
+Manual fallback:
 
 ```bash
 cp ytdl.js ytdl.user.js

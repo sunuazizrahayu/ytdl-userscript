@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ytdl.js
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        run: |
+          set -euo pipefail
+          node --check ytdl.js
+
+          META_VERSION=$(awk '/^\/\/ @version/ { print $3; exit }' ytdl.js | tr -d '[:space:]')
+          CODE_VERSION=$(sed -n "s/^  const VERSION = '\([^']*\)';/\1/p" ytdl.js | head -n1 | tr -d '[:space:]')
+
+          if [ -z "$META_VERSION" ] || [ -z "$CODE_VERSION" ]; then
+            echo "::error::Could not read @version or const VERSION from ytdl.js"
+            exit 1
+          fi
+
+          if [ "$META_VERSION" != "$CODE_VERSION" ]; then
+            echo "::error::Version mismatch: @version is $META_VERSION but const VERSION is $CODE_VERSION"
+            exit 1
+          fi
+
+          echo "VERSION=$META_VERSION" >> "$GITHUB_ENV"
+          echo "Releasing version $META_VERSION"
+
+      - name: Check for existing release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp ytdl.js ytdl.user.js
+          gh release create "v$VERSION" ytdl.user.js \
+            --title "YTDL $VERSION" \
+            --target "$GITHUB_SHA" \
+            --generate-notes
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check.outputs.exists }}" = "true" ]; then
+            echo "v$VERSION already exists — nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Published v$VERSION with asset ytdl.user.js." >> "$GITHUB_STEP_SUMMARY"
+          fi
